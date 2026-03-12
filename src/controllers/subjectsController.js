@@ -97,7 +97,7 @@ const listChapters = async (req, res) => {
     try {
         const userId = req.user ? req.user.id : null;
         const result = await pool.query(
-            `SELECT c.id, c.name, c.description, c.order_num, c.tags, c.created_at,
+            `SELECT c.id, c.subject_id, c.name, c.description, c.order_num, c.tags, c.created_at,
               COUNT(q.id)::int AS question_count,
               ps.score AS last_practice_score,
               ps.total AS last_practice_total,

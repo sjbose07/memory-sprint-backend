@@ -46,7 +46,8 @@ CREATE TABLE IF NOT EXISTS chapters (
 -- Questions table
 CREATE TABLE IF NOT EXISTS questions (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    chapter_id UUID NOT NULL REFERENCES chapters(id) ON DELETE CASCADE,
+    chapter_id UUID REFERENCES chapters(id) ON DELETE CASCADE,
+    current_affair_id UUID REFERENCES current_affairs(id) ON DELETE CASCADE,
     question_text TEXT NOT NULL,
     option_a TEXT NOT NULL,
     option_b TEXT NOT NULL,
@@ -62,7 +63,7 @@ CREATE TABLE IF NOT EXISTS questions (
 CREATE TABLE IF NOT EXISTS tests (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     title VARCHAR(255) NOT NULL,
-    chapter_id UUID NOT NULL REFERENCES chapters(id) ON DELETE CASCADE,
+    chapter_id UUID REFERENCES chapters(id) ON DELETE CASCADE,
     timer_minutes INT NOT NULL DEFAULT 30,
     question_count INT NOT NULL DEFAULT 10,
     is_negative BOOLEAN DEFAULT FALSE,
@@ -110,6 +111,7 @@ CREATE TABLE IF NOT EXISTS current_affairs (
     topic VARCHAR(255),
     tags TEXT[] DEFAULT '{}',
     is_practice_enabled BOOLEAN DEFAULT FALSE,
+    type VARCHAR(20) DEFAULT 'oneliner',
     created_by UUID REFERENCES users(id) ON DELETE SET NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );

@@ -4,18 +4,22 @@ const pdfParse = require('pdf-parse');
 
 // GET /questions?chapter_id=...
 const listQuestions = async (req, res) => {
-    const { chapter_id } = req.query;
+    const { chapter_id, current_affair_id } = req.query;
     try {
         let query = `SELECT q.id, q.question_text, q.option_a, q.option_b, q.option_c, q.option_d,
-                        q.correct_option, q.explanation, q.created_at,
-                        c.name AS chapter_name, c.tags AS chapter_tags, s.name AS subject_name
+                        q.correct_option, q.explanation, q.created_at, q.chapter_id, q.current_affair_id,
+                        c.name AS chapter_name, s.name AS subject_name, ca.title AS ca_title
                  FROM questions q
-                 JOIN chapters c ON c.id = q.chapter_id
-                 JOIN subjects s ON s.id = c.subject_id`;
+                 LEFT JOIN chapters c ON c.id = q.chapter_id
+                 LEFT JOIN subjects s ON s.id = c.subject_id
+                 LEFT JOIN current_affairs ca ON ca.id = q.current_affair_id`;
         const params = [];
         if (chapter_id) {
-            query += ' WHERE q.chapter_id = $1';
             params.push(chapter_id);
+            query += ` WHERE q.chapter_id = $${params.length}`;
+        } else if (current_affair_id) {
+            params.push(current_affair_id);
+            query += ` WHERE q.current_affair_id = $${params.length}`;
         }
         query += ' ORDER BY q.created_at DESC';
         const result = await pool.query(query, params);
@@ -27,8 +31,8 @@ const listQuestions = async (req, res) => {
 
 // POST /questions — single question
 const createQuestion = async (req, res) => {
-    const { chapter_id, question_text, option_a, option_b, option_c, option_d, correct_option, explanation } = req.body;
-    if (!chapter_id || !question_text || !option_a || !option_b || !option_c || !option_d || !correct_option) {
+    const { chapter_id, current_affair_id, question_text, option_a, option_b, option_c, option_d, correct_option, explanation } = req.body;
+    if ((!chapter_id && !current_affair_id) || !question_text || !option_a || !option_b || !option_c || !option_d || !correct_option) {
         return res.status(400).json({ error: 'Missing required fields' });
     }
     if (!['A', 'B', 'C', 'D'].includes(correct_option.toUpperCase())) {
@@ -36,9 +40,9 @@ const createQuestion = async (req, res) => {
     }
     try {
         const result = await pool.query(
-            `INSERT INTO questions (chapter_id, question_text, option_a, option_b, option_c, option_d, correct_option, explanation, created_by)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *`,
-            [chapter_id, question_text, option_a, option_b, option_c, option_d, correct_option.toUpperCase(), explanation || null, req.user.id]
+            `INSERT INTO questions (chapter_id, current_affair_id, question_text, option_a, option_b, option_c, option_d, correct_option, explanation, created_by)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING *`,
+            [chapter_id || null, current_affair_id || null, question_text, option_a, option_b, option_c, option_d, correct_option.toUpperCase(), explanation || null, req.user.id]
         );
         res.status(201).json(result.rows[0]);
     } catch (err) {
@@ -48,8 +52,8 @@ const createQuestion = async (req, res) => {
 
 // POST /questions/bulk — parse text or PDF and insert many questions
 const bulkUploadQuestions = async (req, res) => {
-    const { chapter_id, text_content } = req.body;
-    if (!chapter_id) return res.status(400).json({ error: 'chapter_id is required' });
+    const { chapter_id, current_affair_id, text_content } = req.body;
+    if (!chapter_id && !current_affair_id) return res.status(400).json({ error: 'chapter_id or current_affair_id is required' });
 
     let rawText = text_content || '';
 
@@ -83,9 +87,9 @@ const bulkUploadQuestions = async (req, res) => {
         const inserted = [];
         for (const q of parsed) {
             const r = await client.query(
-                `INSERT INTO questions (chapter_id, question_text, option_a, option_b, option_c, option_d, correct_option, explanation, created_by)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id`,
-                [chapter_id, q.question_text, q.option_a, q.option_b, q.option_c, q.option_d, q.correct_option, q.explanation || null, req.user.id]
+                `INSERT INTO questions (chapter_id, current_affair_id, question_text, option_a, option_b, option_c, option_d, correct_option, explanation, created_by)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING id`,
+                [chapter_id || null, current_affair_id || null, q.question_text, q.option_a, q.option_b, q.option_c, q.option_d, q.correct_option, q.explanation || null, req.user.id]
             );
             inserted.push(r.rows[0].id);
         }
@@ -141,7 +145,7 @@ const bulkExportQuestions = async (req, res) => {
     try {
         const result = await pool.query(
             `SELECT question_text, option_a, option_b, option_c, option_d, correct_option, explanation
-             FROM questions WHERE chapter_id = $1 ORDER BY created_at ASC`,
+             FROM questions WHERE chapter_id = $1 OR current_affair_id = $1 ORDER BY created_at ASC`,
             [chapterId]
         );
 
@@ -170,17 +174,18 @@ const bulkSyncQuestions = async (req, res) => {
     try {
         await client.query('BEGIN');
 
-        // 1. Delete existing questions for this chapter
-        // ON DELETE CASCADE handles related records
-        await client.query('DELETE FROM questions WHERE chapter_id = $1', [chapterId]);
+        // 1. Delete existing questions
+        await client.query('DELETE FROM questions WHERE chapter_id = $1 OR current_affair_id = $1', [chapterId]);
 
         // 2. Insert new questions
         const inserted = [];
         for (const q of parsed) {
             const r = await client.query(
-                `INSERT INTO questions (chapter_id, question_text, option_a, option_b, option_c, option_d, correct_option, explanation, created_by)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id`,
-                [chapterId, q.question_text, q.option_a, q.option_b, q.option_c, q.option_d, q.correct_option, q.explanation || null, req.user.id]
+                `INSERT INTO questions (chapter_id, current_affair_id, question_text, option_a, option_b, option_c, option_d, correct_option, explanation, created_by)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING id`,
+                [null, // Handled by CA-specific logic if needed, but for now generic
+                 chapterId, // Assuming it's a CA ID if we are syncing CA
+                 q.question_text, q.option_a, q.option_b, q.option_c, q.option_d, q.correct_option, q.explanation || null, req.user.id]
             );
             inserted.push(r.rows[0].id);
         }
