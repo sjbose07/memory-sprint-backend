@@ -11,62 +11,49 @@
 
 function parseQuestions(text) {
     const questions = [];
-    const blocks = text
-        .replace(/\r\n/g, '\n')
-        .trim()
-        .split(/\n{2,}/);  // split by blank lines
+    const blocks = text.replace(/\r\n/g, '\n').trim().split(/\n{2,}/);
 
     for (const block of blocks) {
-        const lines = block.trim().split('\n').filter(l => l.trim());
-        if (lines.length < 3) continue;
+        const fullText = block.trim();
+        
+        // Find answer
+        const ansMatch = fullText.match(/\bANSWER\s*:\s*([A-D])/i);
+        if (!ansMatch) continue;
+        const correctOption = ansMatch[1].toUpperCase();
 
-        // Find ANSWER: line
-        const answerLine = lines.find(l => /^ANSWER\s*:/i.test(l));
-        if (!answerLine) continue;
-
-        const correctOption = answerLine.replace(/^ANSWER\s*:\s*/i, '').trim().toUpperCase();
-        if (!['A', 'B', 'C', 'D'].includes(correctOption)) continue;
-
-        // Question text is everything before the options line and answer line
-        const optionsLineIndex = lines.findIndex(l =>
-            /\bA\.\s+.+\bB\.\s+.+\bC\.\s+.+\bD\.\s+/i.test(l) ||
-            /^A\.\s+/i.test(l)
-        );
-
-        if (optionsLineIndex === -1) continue;
-
-        const questionText = lines.slice(0, optionsLineIndex).join(' ').trim();
-        const optionsLine = lines[optionsLineIndex];
-
-        // Parse options — supports same line: "A. opt  B. opt  C. opt  D. opt"
-        const optPattern = /A\.\s*(.*?)\s+B\.\s*(.*?)\s+C\.\s*(.*?)\s+D\.\s*(.*?)(?:\s+ANSWER|$)/i;
-        const match = optionsLine.match(optPattern);
-
-        let optionA, optionB, optionC, optionD;
-
-        if (match) {
-            optionA = match[1].trim();
-            optionB = match[2].trim();
-            optionC = match[3].trim();
-            optionD = match[4].trim();
-        } else {
-            // Try multi-line options
-            const optLines = lines.filter(l => /^[A-D]\.\s+/i.test(l));
-            if (optLines.length < 4) continue;
-            optionA = optLines[0].replace(/^A\.\s+/i, '').trim();
-            optionB = optLines[1].replace(/^B\.\s+/i, '').trim();
-            optionC = optLines[2].replace(/^C\.\s+/i, '').trim();
-            optionD = optLines[3].replace(/^D\.\s+/i, '').trim();
+        // Find explanation
+        let explanation = '';
+        const expMatch = fullText.match(/\bEXPLANATION\s*:\s*([\s\S]*)$/i);
+        if (expMatch) {
+            explanation = expMatch[1].trim();
         }
+
+        // Clean out ANSWER and EXPLANATION
+        let cleaned = fullText.replace(/\bANSWER\s*:\s*[A-D]/i, '').replace(/\bEXPLANATION\s*:[\s\S]*$/i, '').trim();
+
+        // Find A. B. C. D.
+        const aMatch = /(?:^|\s)A\.\s/i.exec(cleaned);
+        const bMatch = /(?:^|\s)B\.\s/i.exec(cleaned);
+        const cMatch = /(?:^|\s)C\.\s/i.exec(cleaned);
+        const dMatch = /(?:^|\s)D\.\s/i.exec(cleaned);
+
+        if (!aMatch || !bMatch || !cMatch || !dMatch) continue;
+
+        // Ensure indices extract smoothly from start of matched dot
+        const aIndex = aMatch.index + aMatch[0].toUpperCase().indexOf('A');
+        const bIndex = bMatch.index + bMatch[0].toUpperCase().indexOf('B');
+        const cIndex = cMatch.index + cMatch[0].toUpperCase().indexOf('C');
+        const dIndex = dMatch.index + dMatch[0].toUpperCase().indexOf('D');
+
+        if (!(aIndex < bIndex && bIndex < cIndex && cIndex < dIndex)) continue;
+
+        const questionText = cleaned.substring(0, aIndex).trim();
+        const optionA = cleaned.substring(aIndex + 2, bIndex).trim().replace(/^\.*|\.*$/g, '').trim();
+        const optionB = cleaned.substring(bIndex + 2, cIndex).trim().replace(/^\.*|\.*$/g, '').trim();
+        const optionC = cleaned.substring(cIndex + 2, dIndex).trim().replace(/^\.*|\.*$/g, '').trim();
+        const optionD = cleaned.substring(dIndex + 2).trim().replace(/^\.*|\.*$/g, '').trim();
 
         if (!questionText || !optionA || !optionB || !optionC || !optionD) continue;
-
-        // Parse explanation (optional)
-        const expLineIndex = lines.findIndex(l => /^EXPLANATION\s*:/i.test(l));
-        let explanation = '';
-        if (expLineIndex !== -1) {
-            explanation = lines.slice(expLineIndex).join('\n').replace(/^EXPLANATION\s*:\s*/i, '').trim();
-        }
 
         questions.push({
             question_text: questionText,
