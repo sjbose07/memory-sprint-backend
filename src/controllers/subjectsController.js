@@ -98,12 +98,12 @@ const listChapters = async (req, res) => {
         const userId = req.user ? req.user.id : null;
         const result = await pool.query(
             `SELECT c.id, c.subject_id, c.name, c.description, c.order_num, c.tags, c.created_at,
-              COUNT(q.id)::int AS question_count,
+              (SELECT COUNT(q.id)::int FROM questions q WHERE q.chapter_id = c.id AND q.type = 'mcq') AS mcq_count,
+              (SELECT COUNT(sm.id)::int FROM study_materials sm WHERE sm.chapter_id = c.id) AS material_count,
               ps.score AS last_practice_score,
               ps.total AS last_practice_total,
               ps.last_practiced_at
        FROM chapters c
-       LEFT JOIN questions q ON q.chapter_id = c.id
        LEFT JOIN practice_scores ps ON ps.chapter_id = c.id AND ps.user_id = $2
        WHERE c.subject_id = $1
        GROUP BY c.id, ps.score, ps.total, ps.last_practiced_at 

@@ -21,6 +21,12 @@ const listQuestions = async (req, res) => {
             params.push(current_affair_id);
             query += ` WHERE q.current_affair_id = $${params.length}`;
         }
+
+        const { type } = req.query;
+        if (type) {
+            params.push(type);
+            query += (params.length === 1 ? ' WHERE' : ' AND') + ` q.type = $${params.length}`;
+        }
         query += ' ORDER BY q.created_at DESC';
         const result = await pool.query(query, params);
         res.json(result.rows);
@@ -31,7 +37,7 @@ const listQuestions = async (req, res) => {
 
 // POST /questions — single question
 const createQuestion = async (req, res) => {
-    const { chapter_id, current_affair_id, question_text, option_a, option_b, option_c, option_d, correct_option, explanation } = req.body;
+    const { chapter_id, current_affair_id, question_text, option_a, option_b, option_c, option_d, correct_option, explanation, type } = req.body;
     if ((!chapter_id && !current_affair_id) || !question_text || !option_a || !option_b || !option_c || !option_d || !correct_option) {
         return res.status(400).json({ error: 'Missing required fields' });
     }
@@ -40,9 +46,9 @@ const createQuestion = async (req, res) => {
     }
     try {
         const result = await pool.query(
-            `INSERT INTO questions (chapter_id, current_affair_id, question_text, option_a, option_b, option_c, option_d, correct_option, explanation, created_by)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING *`,
-            [chapter_id || null, current_affair_id || null, question_text, option_a, option_b, option_c, option_d, correct_option.toUpperCase(), explanation || null, req.user.id]
+            `INSERT INTO questions (chapter_id, current_affair_id, question_text, option_a, option_b, option_c, option_d, correct_option, explanation, created_by, type)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING *`,
+            [chapter_id || null, current_affair_id || null, question_text, option_a, option_b, option_c, option_d, correct_option.toUpperCase(), explanation || null, req.user.id, type || 'mcq']
         );
         res.status(201).json(result.rows[0]);
     } catch (err) {
@@ -52,7 +58,7 @@ const createQuestion = async (req, res) => {
 
 // POST /questions/bulk — parse text or PDF and insert many questions
 const bulkUploadQuestions = async (req, res) => {
-    const { chapter_id, current_affair_id, text_content } = req.body;
+    const { chapter_id, current_affair_id, text_content, type } = req.body;
     if (!chapter_id && !current_affair_id) return res.status(400).json({ error: 'chapter_id or current_affair_id is required' });
 
     let rawText = text_content || '';
@@ -76,7 +82,7 @@ const bulkUploadQuestions = async (req, res) => {
 
     if (!rawText.trim()) return res.status(400).json({ error: 'No content provided' });
 
-    const parsed = parseQuestions(rawText);
+    const parsed = parseQuestions(rawText, type || 'mcq');
     if (!parsed.length) {
         return res.status(400).json({ error: 'No valid questions found in content. Check format.' });
     }
@@ -87,9 +93,9 @@ const bulkUploadQuestions = async (req, res) => {
         const inserted = [];
         for (const q of parsed) {
             const r = await client.query(
-                `INSERT INTO questions (chapter_id, current_affair_id, question_text, option_a, option_b, option_c, option_d, correct_option, explanation, created_by)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING id`,
-                [chapter_id || null, current_affair_id || null, q.question_text, q.option_a, q.option_b, q.option_c, q.option_d, q.correct_option, q.explanation || null, req.user.id]
+                `INSERT INTO questions (chapter_id, current_affair_id, question_text, option_a, option_b, option_c, option_d, correct_option, explanation, created_by, type)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING id`,
+                [chapter_id || null, current_affair_id || null, q.question_text, q.option_a, q.option_b, q.option_c, q.option_d, q.correct_option, q.explanation || null, req.user.id, type || 'mcq']
             );
             inserted.push(r.rows[0].id);
         }
@@ -116,7 +122,7 @@ const deleteQuestion = async (req, res) => {
 
 // POST /questions/preview — parse only, return parsed questions without inserting
 const previewQuestions = async (req, res) => {
-    const { text_content } = req.body;
+    const { text_content, type } = req.body;
     let rawText = text_content || '';
 
     if (req.file) {
@@ -159,13 +165,13 @@ const bulkExportQuestions = async (req, res) => {
 // PUT /questions/bulk-sync/:chapterId
 const bulkSyncQuestions = async (req, res) => {
     const { chapterId } = req.params;
-    const { text_content } = req.body;
+    const { text_content, type } = req.body;
 
     if (!text_content || !text_content.trim()) {
         return res.status(400).json({ error: 'No content provided for sync' });
     }
 
-    const parsed = parseQuestions(text_content);
+    const parsed = parseQuestions(text_content, type || 'mcq');
     if (!parsed.length) {
         return res.status(400).json({ error: 'No valid questions found in content. Check format.' });
     }
@@ -181,11 +187,11 @@ const bulkSyncQuestions = async (req, res) => {
         const inserted = [];
         for (const q of parsed) {
             const r = await client.query(
-                `INSERT INTO questions (chapter_id, current_affair_id, question_text, option_a, option_b, option_c, option_d, correct_option, explanation, created_by)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING id`,
+                `INSERT INTO questions (chapter_id, current_affair_id, question_text, option_a, option_b, option_c, option_d, correct_option, explanation, created_by, type)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING id`,
                 [null, // Handled by CA-specific logic if needed, but for now generic
                  chapterId, // Assuming it's a CA ID if we are syncing CA
-                 q.question_text, q.option_a, q.option_b, q.option_c, q.option_d, q.correct_option, q.explanation || null, req.user.id]
+                 q.question_text, q.option_a, q.option_b, q.option_c, q.option_d, q.correct_option, q.explanation || null, req.user.id, type || 'mcq']
             );
             inserted.push(r.rows[0].id);
         }

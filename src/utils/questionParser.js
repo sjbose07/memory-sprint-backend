@@ -9,7 +9,7 @@
  * (blank line separates questions)
  */
 
-function parseQuestions(text) {
+function parseQuestions(text, type = 'mcq') {
     const questions = [];
     const blocks = text.replace(/\r\n/g, '\n').trim().split(/\n{2,}/);
 

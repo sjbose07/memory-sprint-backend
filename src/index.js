@@ -15,6 +15,7 @@ const analyticsRoutes = require('./routes/analytics');
 const bookmarksRoutes = require('./routes/bookmarks');
 const practiceRoutes = require('./routes/practice');
 const currentAffairsRoutes = require('./routes/currentAffairs');
+const studyMaterialsRoutes = require('./routes/studyMaterials');
 
 const app = express();
 
@@ -48,6 +49,7 @@ app.use('/analytics', analyticsRoutes);
 app.use('/bookmarks', bookmarksRoutes);
 app.use('/practice', practiceRoutes);
 app.use('/current-affairs', currentAffairsRoutes);
+app.use('/study-materials', studyMaterialsRoutes);
 
 // Global error handler
 app.use((err, req, res, next) => {
