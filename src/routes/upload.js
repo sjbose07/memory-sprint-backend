@@ -18,6 +18,7 @@ router.post('/', requireRole('admin', 'moderator'), upload.single('file'), (req,
             format: req.file.format || req.file.path.split('.').pop()
         });
     } catch (err) {
+        console.error('Upload catch error:', err);
         res.status(500).json({ error: err.message });
     }
 });
