@@ -16,6 +16,7 @@ const bookmarksRoutes = require('./routes/bookmarks');
 const practiceRoutes = require('./routes/practice');
 const currentAffairsRoutes = require('./routes/currentAffairs');
 const studyMaterialsRoutes = require('./routes/studyMaterials');
+const uploadRoutes = require('./routes/upload');
 
 const app = express();
 
@@ -50,6 +51,7 @@ app.use('/bookmarks', bookmarksRoutes);
 app.use('/practice', practiceRoutes);
 app.use('/current-affairs', currentAffairsRoutes);
 app.use('/study-materials', studyMaterialsRoutes);
+app.use('/upload', uploadRoutes);
 
 // Global error handler
 app.use((err, req, res, next) => {
