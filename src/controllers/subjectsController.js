@@ -97,7 +97,7 @@ const listChapters = async (req, res) => {
     try {
         const userId = req.user ? req.user.id : null;
         const result = await pool.query(
-            `SELECT c.id, c.subject_id, c.name, c.description, c.order_num, c.tags, c.created_at,
+            `SELECT c.id, c.subject_id, c.name, c.description, c.order_num, c.tags, c.type, c.created_at,
               (SELECT COUNT(q.id)::int FROM questions q WHERE q.chapter_id = c.id AND q.type = 'mcq') AS mcq_count,
               (SELECT COUNT(sm.id)::int FROM study_materials sm WHERE sm.chapter_id = c.id) AS material_count,
               ps.score AS last_practice_score,
@@ -118,12 +118,12 @@ const listChapters = async (req, res) => {
 
 // POST /subjects/:id/chapters
 const createChapter = async (req, res) => {
-    const { name, order_num, tags, description } = req.body;
+    const { name, order_num, tags, description, type } = req.body;
     if (!name) return res.status(400).json({ error: 'Chapter name is required' });
     try {
         const result = await pool.query(
-            'INSERT INTO chapters (subject_id, name, order_num, tags, description) VALUES ($1, $2, $3, $4, $5) RETURNING *',
-            [req.params.id, name, order_num || 0, tags || [], description || null]
+            'INSERT INTO chapters (subject_id, name, order_num, tags, description, type) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
+            [req.params.id, name, order_num || 0, tags || [], description || null, type || 'mcq']
         );
         res.status(201).json(result.rows[0]);
     } catch (err) {

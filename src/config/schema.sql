@@ -40,6 +40,7 @@ CREATE TABLE IF NOT EXISTS chapters (
     name VARCHAR(255) NOT NULL,
     order_num INT NOT NULL DEFAULT 0,
     tags TEXT[] DEFAULT '{}',
+    type VARCHAR(20) DEFAULT 'mcq',
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
