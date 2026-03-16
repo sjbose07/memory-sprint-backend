@@ -1,4 +1,5 @@
 const pool = require('../config/db');
+const { deleteAssetsFromText } = require('../utils/cloudinaryHelper');
 
 // GET /current-affairs
 const listCurrentAffairs = async (req, res) => {
@@ -106,9 +107,20 @@ const editCurrentAffairs = async (req, res) => {
 
 // DELETE /current-affairs/:id
 const deleteCurrentAffairs = async (req, res) => {
+    const { id } = req.params;
     try {
-        const result = await pool.query('DELETE FROM current_affairs WHERE id = $1 RETURNING id', [req.params.id]);
-        if (!result.rows.length) return res.status(404).json({ error: 'Current Affairs not found' });
+        // 1. Fetch content for cleanup
+        const caRes = await pool.query('SELECT content FROM current_affairs WHERE id = $1', [id]);
+        if (!caRes.rows.length) return res.status(404).json({ error: 'Current Affairs not found' });
+        
+        const content = caRes.rows[0].content;
+
+        // 2. Delete from database
+        await pool.query('DELETE FROM current_affairs WHERE id = $1', [id]);
+        
+        // 3. Cloudinary cleanup
+        deleteAssetsFromText(content).catch(err => console.error('Cloudinary cleanup error (CA):', err));
+        
         res.json({ message: 'Current Affairs deleted' });
     } catch (err) {
         res.status(500).json({ error: err.message });

@@ -1,4 +1,5 @@
 const pool = require('../config/db');
+const { deleteAssetsFromText } = require('../utils/cloudinaryHelper');
 
 // GET /study-materials?chapter_id=...
 const listMaterials = async (req, res) => {
@@ -61,9 +62,20 @@ const updateMaterial = async (req, res) => {
 
 // DELETE /study-materials/:id
 const deleteMaterial = async (req, res) => {
+    const { id } = req.params;
     try {
-        const result = await pool.query('DELETE FROM study_materials WHERE id = $1 RETURNING id', [req.params.id]);
-        if (!result.rows.length) return res.status(404).json({ error: 'Material not found' });
+        // 1. Fetch content to find media URLs
+        const materialRes = await pool.query('SELECT content FROM study_materials WHERE id = $1', [id]);
+        if (!materialRes.rows.length) return res.status(404).json({ error: 'Material not found' });
+        
+        const content = materialRes.rows[0].content;
+
+        // 2. Delete from database
+        await pool.query('DELETE FROM study_materials WHERE id = $1', [id]);
+        
+        // 3. Delete from Cloudinary (don't block the response)
+        deleteAssetsFromText(content).catch(err => console.error('Cloudinary cleanup error:', err));
+        
         res.json({ message: 'Material deleted' });
     } catch (err) {
         res.status(500).json({ error: err.message });

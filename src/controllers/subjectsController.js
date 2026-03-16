@@ -1,4 +1,5 @@
 const pool = require('../config/db');
+const { deleteAssetsFromText } = require('../utils/cloudinaryHelper');
 
 // GET /subjects
 const listSubjects = async (req, res) => {
@@ -66,9 +67,26 @@ const createSubject = async (req, res) => {
 
 // DELETE /subjects/:id
 const deleteSubject = async (req, res) => {
+    const { id } = req.params;
     try {
-        const result = await pool.query('DELETE FROM subjects WHERE id = $1 RETURNING id', [req.params.id]);
+        // 1. Fetch all materials in all chapters of this subject for cleanup
+        const materialsRes = await pool.query(
+            `SELECT sm.content 
+             FROM study_materials sm
+             JOIN chapters c ON c.id = sm.chapter_id
+             WHERE c.subject_id = $1`,
+            [id]
+        );
+
+        // 2. Delete from database (Chapters/Materials should cascade-delete in DB)
+        const result = await pool.query('DELETE FROM subjects WHERE id = $1 RETURNING id', [id]);
         if (!result.rows.length) return res.status(404).json({ error: 'Subject not found' });
+
+        // 3. Trigger Cloudinary cleanup
+        materialsRes.rows.forEach(material => {
+            deleteAssetsFromText(material.content).catch(err => console.error('Cloudinary cleanup error (Subject Material):', err));
+        });
+
         res.json({ message: 'Subject deleted' });
     } catch (err) {
         res.status(500).json({ error: err.message });
@@ -157,11 +175,21 @@ const editChapter = async (req, res) => {
 const deleteChapter = async (req, res) => {
     const { id: subjectId, chapterId } = req.params;
     try {
+        // 1. Fetch all materials in this chapter for cleanup
+        const materialsRes = await pool.query('SELECT content FROM study_materials WHERE chapter_id = $1', [chapterId]);
+        
+        // 2. Delete from database
         const result = await pool.query(
             'DELETE FROM chapters WHERE id = $1 AND subject_id = $2 RETURNING id',
             [chapterId, subjectId]
         );
         if (!result.rows.length) return res.status(404).json({ error: 'Chapter not found' });
+
+        // 3. Trigger Cloudinary cleanup for each material
+        materialsRes.rows.forEach(material => {
+            deleteAssetsFromText(material.content).catch(err => console.error('Cloudinary cleanup error (Chapter Material):', err));
+        });
+
         res.json({ message: 'Chapter deleted' });
     } catch (err) {
         res.status(500).json({ error: err.message });
