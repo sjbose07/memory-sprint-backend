@@ -27,16 +27,21 @@ const storage = new CloudinaryStorage({
     const sanitizedSubject = rawSubject.replace(/[^a-zA-Z0-9]/g, "_");
     
     let mediaType = 'other';
-    if (file.mimetype.startsWith('image/')) {
-        mediaType = 'image';
-    } else if (file.mimetype === 'application/pdf') {
-        mediaType = 'pdf';
+    const isPdf = file.mimetype === 'application/pdf';
+    if (file.mimetype.startsWith('image/')) mediaType = 'image';
+    else if (isPdf) mediaType = 'pdf';
+    
+    // For 'raw' (PDFs), we MUST include the extension in public_id to access it easily.
+    // For 'image', we strip it so Cloudinary can append the delivery format automatically.
+    let sanitizedFilename = file.originalname.replace(/[^a-zA-Z0-9.-]/g, "_");
+    if (!isPdf) {
+        sanitizedFilename = sanitizedFilename.replace(/\.[^/.]+$/, "");
     }
 
     return {
         folder: `mcq-practice/${sanitizedSubject}/${mediaType}`,
-        resource_type: 'auto', 
-        public_id: `${Date.now()}-${file.originalname.replace(/[^a-zA-Z0-9.-]/g, "_")}`
+        resource_type: isPdf ? 'raw' : 'image', 
+        public_id: `${Date.now()}-${sanitizedFilename}`
     };
   },
 });
