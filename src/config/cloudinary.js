@@ -20,8 +20,21 @@ if (process.env.CLOUDINARY_CLOUD_NAME && process.env.CLOUDINARY_API_KEY && proce
 const storage = new CloudinaryStorage({
   cloudinary: cloudinary,
   params: async (req, file) => {
+    // Determine folder structure: mcq-practice/[subject]/[type]
+    // Expecting 'subject' and 'type' in req.body. 
+    // IMPORTANT: Frontend MUST append these to FormData BEFORE the 'file' field.
+    const rawSubject = req.body.subject || 'General';
+    const sanitizedSubject = rawSubject.replace(/[^a-zA-Z0-9]/g, "_");
+    
+    let mediaType = 'other';
+    if (file.mimetype.startsWith('image/')) {
+        mediaType = 'image';
+    } else if (file.mimetype === 'application/pdf') {
+        mediaType = 'pdf';
+    }
+
     return {
-        folder: 'mcq-practice/materials',
+        folder: `mcq-practice/${sanitizedSubject}/${mediaType}`,
         resource_type: 'auto', 
         public_id: `${Date.now()}-${file.originalname.replace(/[^a-zA-Z0-9.-]/g, "_")}`
     };
