@@ -1,42 +1,72 @@
 const pool = require('../config/db');
 
+// Simple in-memory cache — keyed by userId, TTL 30 seconds
+const cache = new Map();
+const CACHE_TTL_MS = 30_000;
+
+function getCached(userId) {
+    const entry = cache.get(userId);
+    if (!entry) return null;
+    if (Date.now() - entry.ts > CACHE_TTL_MS) {
+        cache.delete(userId);
+        return null;
+    }
+    return entry.data;
+}
+
+function setCached(userId, data) {
+    cache.set(userId, { ts: Date.now(), data });
+}
+
 // GET /home/summary
 const getHomeSummary = async (req, res) => {
     try {
-        const queries = [
-            // 1. Recent Tests
-            pool.query(`
-                SELECT t.id, t.title, t.timer_minutes, t.question_count, t.created_at,
-                       t.is_negative AS negative_marking, t.is_strict,
-                       c.name AS chapter_name, s.name AS subject_name
-                FROM tests t
-                JOIN chapters c ON c.id = t.chapter_id
-                JOIN subjects s ON s.id = c.subject_id
-                ORDER BY t.created_at DESC
-                LIMIT 5
-            `).catch(e => { console.error('Tests Query Error:', e.message); return { rows: [] }; }),
+        const userId = req.user.id;
+        const cached = getCached(userId);
 
-            // 2. Recent Current Affairs
-            pool.query(`
-                SELECT ca.id, ca.title, ca.topic, ca.content, ca.type, ca.created_at, COUNT(q.id) as question_count 
-                FROM current_affairs ca 
-                LEFT JOIN questions q ON ca.id = q.current_affair_id 
-                GROUP BY ca.id 
-                ORDER BY ca.created_at DESC
-                LIMIT 5
-            `).catch(e => { console.error('CA Query Error:', e); return { rows: [] }; }),
+        let testsRows, caRows, subjects;
 
-            // 3. Subjects with chapter counts
-            pool.query(`
-                SELECT s.*, (SELECT COUNT(*)::int FROM chapters c WHERE c.subject_id = s.id) as chapter_count
-                FROM subjects s
-                ORDER BY s.name ASC
-            `).catch(e => { console.error('Subjects Query Error:', e); return { rows: [] }; })
-        ];
+        if (cached) {
+            // Serve shared data from cache (instant)
+            ({ testsRows, caRows, subjects } = cached);
+        } else {
+            // Fetch shared data in parallel
+            const [testsRes, caRes, subjectsRes] = await Promise.all([
+                pool.query(`
+                    SELECT t.id, t.title, t.timer_minutes, t.question_count, t.created_at,
+                           t.is_negative AS negative_marking, t.is_strict,
+                           c.name AS chapter_name, s.name AS subject_name
+                    FROM tests t
+                    JOIN chapters c ON c.id = t.chapter_id
+                    JOIN subjects s ON s.id = c.subject_id
+                    ORDER BY t.created_at DESC
+                    LIMIT 5
+                `).catch(e => { console.error('Tests Query Error:', e.message); return { rows: [] }; }),
 
-        const [testsRes, caRes, subjectsRes] = await Promise.all(queries);
+                pool.query(`
+                    SELECT ca.id, ca.title, ca.topic, ca.content, ca.type, ca.created_at, COUNT(q.id) as question_count 
+                    FROM current_affairs ca 
+                    LEFT JOIN questions q ON ca.id = q.current_affair_id 
+                    GROUP BY ca.id 
+                    ORDER BY ca.created_at DESC
+                    LIMIT 5
+                `).catch(e => { console.error('CA Query Error:', e.message); return { rows: [] }; }),
 
-        const subjects = subjectsRes.rows;
+                pool.query(`
+                    SELECT s.*, (SELECT COUNT(*)::int FROM chapters c WHERE c.subject_id = s.id) as chapter_count
+                    FROM subjects s
+                    ORDER BY s.name ASC
+                `).catch(e => { console.error('Subjects Query Error:', e.message); return { rows: [] }; })
+            ]);
+
+            testsRows  = testsRes.rows;
+            caRows     = caRes.rows;
+            subjects   = subjectsRes.rows;
+
+            setCached(userId, { testsRows, caRows, subjects });
+        }
+
+        // Always fetch user-specific last practiced (cheap single query)
         let featuredChapters = [];
         let lastPracticed = null;
 
@@ -56,8 +86,8 @@ const getHomeSummary = async (req, res) => {
                     WHERE c.subject_id = $2 
                     ORDER BY c.order_num ASC 
                     LIMIT 5
-                `, [req.user.id, subjects[0].id]);
-                
+                `, [userId, subjects[0].id]);
+
                 featuredChapters = chaptersRes.rows;
                 lastPracticed = featuredChapters.find(ch => ch.last_score !== null) || featuredChapters[0];
             } catch (e) {
@@ -66,11 +96,11 @@ const getHomeSummary = async (req, res) => {
         }
 
         res.json({
-            recentTests: testsRes.rows,
-            recentCA: caRes.rows,
-            subjects: subjects,
+            recentTests:    testsRows,
+            recentCA:       caRows,
+            subjects:       subjects,
             recentChapters: featuredChapters,
-            lastPracticed: lastPracticed
+            lastPracticed:  lastPracticed
         });
     } catch (err) {
         console.error('Home Summary Global Error:', err);
