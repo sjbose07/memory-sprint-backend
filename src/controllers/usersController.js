@@ -141,6 +141,21 @@ const adminCreateUser = async (req, res) => {
     }
 };
 
+// PATCH /users/me — current user update
+const updateProfile = async (req, res) => {
+    const { name, avatarUrl } = req.body;
+    try {
+        const result = await pool.query(
+            'UPDATE users SET name = COALESCE($1, name), avatar_url = COALESCE($2, avatar_url) WHERE id = $3 RETURNING id, name, email, avatar_url, role',
+            [name, avatarUrl, req.user.id]
+        );
+        if (!result.rows.length) return res.status(404).json({ error: 'User not found' });
+        res.json(result.rows[0]);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+};
+
 module.exports = {
     listUsers,
     updateUserRole,
@@ -148,6 +163,7 @@ module.exports = {
     deleteUser,
     getMyHistory,
     getMySuggestions,
-    adminCreateUser
+    adminCreateUser,
+    updateProfile
 };
 
