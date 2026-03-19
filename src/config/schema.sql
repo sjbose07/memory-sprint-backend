@@ -21,6 +21,10 @@ CREATE TABLE IF NOT EXISTS users (
     avatar_url TEXT,
     role user_role NOT NULL DEFAULT 'user',
     is_approved BOOLEAN DEFAULT FALSE, -- To maintain approval logic
+    is_email_verified BOOLEAN DEFAULT FALSE,
+    email_verification_token TEXT,
+    reset_token TEXT,
+    reset_token_expires TIMESTAMPTZ,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
