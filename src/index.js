@@ -1,8 +1,13 @@
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
+const helmet = require('helmet');
+const compression = require('compression');
+const morgan = require('morgan');
+const rateLimit = require('express-rate-limit');
 const pool = require('./config/db');
-const bcrypt = require('bcryptjs');
+const { createNotice } = require('./utils/noticeService');
+const { startKeepAlive } = require('./utils/keepAlive');
 
 const authRoutes = require('./routes/auth');
 const usersRoutes = require('./routes/users');
@@ -18,13 +23,31 @@ const currentAffairsRoutes = require('./routes/currentAffairs');
 const studyMaterialsRoutes = require('./routes/studyMaterials');
 const homeRoutes = require('./routes/home');
 const uploadRoutes = require('./routes/upload');
+const adminNoticesRoutes = require('./routes/adminNotices');
 
 const app = express();
 
-// Middleware
-app.use(cors());
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+// --- Security & Production Middleware ---
+app.use(helmet()); 
+app.use(compression()); 
+app.use(morgan(process.env.NODE_ENV === 'production' ? 'combined' : 'dev'));
+
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 100,
+  message: { error: 'Too many requests, please try again later.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+app.use(limiter);
+
+const corsOptions = {
+  origin: process.env.CLIENT_URL || '*',
+  optionsSuccessStatus: 200
+};
+app.use(cors(corsOptions));
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 // Health checks
 app.get('/', (req, res) => {
@@ -54,20 +77,63 @@ app.use('/current-affairs', currentAffairsRoutes);
 app.use('/home', homeRoutes);
 app.use('/study-materials', studyMaterialsRoutes);
 app.use('/upload', uploadRoutes);
+app.use('/admin/notices', adminNoticesRoutes);
 
 // Global error handler
 app.use((err, req, res, next) => {
     console.error('Unhandled error:', err);
+    
+    const isProd = process.env.NODE_ENV === 'production';
+    
+    // Create admin notice for unexpected 500 errors
+    if (!res.headersSent) {
+        createNotice('SYSTEM_ERROR', 'API 500 Error', `${err.message}\n${err.stack}`)
+          .catch(e => console.error('Failed to create admin notice:', e));
+    }
+
     if (err.message && err.message.includes('Only PDF')) {
         return res.status(400).json({ error: err.message });
     }
-    res.status(500).json({ error: 'Internal server error', details: err.message, stack: err.stack });
+
+    res.status(500).json({ 
+        error: 'Internal server error', 
+        details: isProd ? 'An unexpected error occurred. Please contact support.' : err.message,
+        stack: isProd ? undefined : err.stack 
+    });
 });
 
 // 404
 app.use((req, res) => {
     res.status(404).json({ error: `Route ${req.method} ${req.path} not found` });
 });
+
+// Process listeners for severe failures
+process.on('uncaughtException', async (err) => {
+    console.error('🔥 UNCAUGHT EXCEPTION:', err);
+    try {
+        await createNotice('SYSTEM_ERROR', 'Uncaught Exception (Server Crashing)', `${err.message}\n${err.stack}`);
+    } finally {
+        process.exit(1);
+    }
+});
+
+process.on('unhandledRejection', async (reason) => {
+    console.error('🔥 UNHANDLED REJECTION:', reason);
+    await createNotice('SYSTEM_ERROR', 'Unhandled Promise Rejection', String(reason)).catch(console.error);
+});
+
+// SIGTERM / SIGINT for graceful shutdown notification
+const gracefulShutdown = async (signal) => {
+    console.log(`\n🛑 Received ${signal}. Notifying admin and shutting down...`);
+    try {
+        await createNotice('SERVER_EVENT', `Server Shutdown (${signal})`, `Server is shutting down on signal: ${signal}`);
+    } finally {
+        process.exit(0);
+    }
+};
+
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 
 const PORT = process.env.PORT || 7860;
 
@@ -84,6 +150,9 @@ const server = app.listen(PORT, '0.0.0.0', () => {
     console.log(`\n🚀 MCQ Backend running on port ${actualPort}`);
     console.log(`   Health: http://localhost:${actualPort}/health`);
     console.log(`   Mode: ${process.env.NODE_ENV || 'development'}\n`);
+    
+    // Start Anti-sleep service
+    startKeepAlive(actualPort);
 });
 
 module.exports = app;

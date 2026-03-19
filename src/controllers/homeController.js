@@ -22,11 +22,11 @@ function setCached(userId, data) {
 const getHomeSummary = async (req, res) => {
     try {
         const userId = req.user.id;
-        const cached = getCached(userId);
+        // const cached = getCached(userId); // Disabled for troubleshooting
 
         let testsRows, caRows, subjects;
 
-        if (cached) {
+        if (false) { // if (cached) {
             // Serve shared data from cache (instant)
             ({ testsRows, caRows, subjects } = cached);
         } else {
@@ -34,11 +34,11 @@ const getHomeSummary = async (req, res) => {
             const [testsRes, caRes, subjectsRes] = await Promise.all([
                 pool.query(`
                     SELECT t.id, t.title, t.timer_minutes, t.question_count, t.created_at,
-                           t.is_negative AS negative_marking, t.is_strict,
+                           t.negative_marking AS is_negative, t.is_strict,
                            c.name AS chapter_name, s.name AS subject_name
                     FROM tests t
-                    JOIN chapters c ON c.id = t.chapter_id
-                    JOIN subjects s ON s.id = c.subject_id
+                    LEFT JOIN chapters c ON c.id = t.chapter_id
+                    LEFT JOIN subjects s ON s.id = c.subject_id
                     ORDER BY t.created_at DESC
                     LIMIT 5
                 `).catch(e => { console.error('Tests Query Error:', e.message); return { rows: [] }; }),

@@ -117,6 +117,16 @@ CREATE TABLE IF NOT EXISTS current_affairs (
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+-- Admin Notices table for system alerts and errors
+CREATE TABLE IF NOT EXISTS admin_notices (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    type VARCHAR(50) NOT NULL, -- 'SYSTEM_ERROR', 'SERVER_EVENT', 'SECURITY_ALERT'
+    title TEXT NOT NULL,
+    message TEXT NOT NULL,
+    is_read BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
 -- Indexes for performance
 CREATE INDEX IF NOT EXISTS idx_chapters_subject ON chapters(subject_id);
 CREATE INDEX IF NOT EXISTS idx_questions_chapter ON questions(chapter_id);
