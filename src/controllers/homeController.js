@@ -83,10 +83,9 @@ const getHomeSummary = async (req, res) => {
                             WHERE t.chapter_id = c.id AND ta.user_id = $1 
                             ORDER BY ta.completed_at DESC LIMIT 1) as last_total
                     FROM chapters c 
-                    WHERE c.subject_id = $2 
-                    ORDER BY c.order_num ASC 
+                    ORDER BY c.created_at DESC 
                     LIMIT 5
-                `, [userId, subjects[0].id]);
+                `, [userId]);
 
                 featuredChapters = chaptersRes.rows;
                 lastPracticed = featuredChapters.find(ch => ch.last_score !== null) || featuredChapters[0];
