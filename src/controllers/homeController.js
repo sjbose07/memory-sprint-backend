@@ -73,7 +73,8 @@ const getHomeSummary = async (req, res) => {
         if (subjects.length > 0) {
             try {
                 const chaptersRes = await pool.query(`
-                    SELECT c.*, 
+                    SELECT c.*, s.name as subject_name,
+                           (SELECT COUNT(*) FROM questions q WHERE q.chapter_id = c.id) as question_count,
                            (SELECT score FROM test_attempts ta 
                             JOIN tests t ON ta.test_id = t.id 
                             WHERE t.chapter_id = c.id AND ta.user_id = $1 
@@ -83,8 +84,9 @@ const getHomeSummary = async (req, res) => {
                             WHERE t.chapter_id = c.id AND ta.user_id = $1 
                             ORDER BY ta.completed_at DESC LIMIT 1) as last_total
                     FROM chapters c 
+                    JOIN subjects s ON s.id = c.subject_id
                     ORDER BY c.created_at DESC 
-                    LIMIT 5
+                    LIMIT 10
                 `, [userId]);
 
                 featuredChapters = chaptersRes.rows;
