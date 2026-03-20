@@ -1,26 +1,18 @@
 const express = require('express');
 const router = express.Router();
-const { 
-    register, 
-    login, 
-    getMe, 
-    googleLogin, 
-    forgotPassword, 
-    resetPassword, 
-    changePassword, 
-    verifyEmail 
-} = require('../controllers/authController');
+const authController = require('../controllers/authController');
 const authMiddleware = require('../middleware/auth');
 
-router.post('/register', register);
-router.post('/login', login);
-router.post('/google', googleLogin);
-router.get('/me', authMiddleware, getMe);
+router.post('/register', authController.register);
+router.post('/login', authController.login);
+router.post('/google', authController.googleLogin);
+router.get('/me', authMiddleware, authController.getMe);
 
 // Password Management
-router.post('/forgot-password', forgotPassword);
-router.post('/reset-password', resetPassword);
-router.post('/change-password', authMiddleware, changePassword);
-router.get('/verify-email', verifyEmail);
+router.post('/forgot-password', authController.forgotPassword);
+router.post('/reset-password', authController.resetPassword);
+router.post('/change-password', authMiddleware, authController.changePassword);
+router.get('/verify-email', authController.verifyEmail);
+router.post('/test-email', authController.testEmail);
 
 module.exports = router;

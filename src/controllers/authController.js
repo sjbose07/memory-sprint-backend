@@ -4,7 +4,7 @@ const crypto = require('crypto');
 const { OAuth2Client } = require('google-auth-library');
 const pool = require('../config/db');
 const { validatePassword } = require('../utils/passwordValidator');
-const { sendResetEmail, sendVerificationEmail } = require('../utils/mailer');
+const { sendResetEmail, sendVerificationEmail, verifyConnection } = require('../utils/mailer');
 
 const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
@@ -291,4 +291,20 @@ const verifyEmail = async (req, res) => {
     }
 };
 
-module.exports = { register, login, getMe, googleLogin, forgotPassword, resetPassword, changePassword, verifyEmail };
+const testEmail = async (req, res) => {
+    const { email } = req.body;
+    try {
+        await sendVerificationEmail(email || process.env.EMAIL_USER, 'test-token');
+        res.json({ message: 'Test email sent successfully' });
+    } catch (err) {
+        console.error('Test Email Error Details:', err);
+        res.status(500).json({ 
+            error: 'Failed to send test email', 
+            details: err.message,
+            code: err.code,
+            command: err.command
+        });
+    }
+};
+
+module.exports = { register, login, getMe, googleLogin, forgotPassword, resetPassword, changePassword, verifyEmail, testEmail };

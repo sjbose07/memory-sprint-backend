@@ -51,4 +51,15 @@ const sendVerificationEmail = async (email, token) => {
   return transporter.sendMail(mailOptions);
 };
 
-module.exports = { sendResetEmail, sendVerificationEmail };
+const verifyConnection = async () => {
+    try {
+        await transporter.verify();
+        console.log('✅ SMTP Connection verified successfully');
+        return true;
+    } catch (err) {
+        console.error('❌ SMTP Connection failed:', err.message);
+        return false;
+    }
+};
+
+module.exports = { sendResetEmail, sendVerificationEmail, verifyConnection };

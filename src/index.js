@@ -8,6 +8,7 @@ const rateLimit = require('express-rate-limit');
 const pool = require('./config/db');
 const { createNotice } = require('./utils/noticeService');
 const { startKeepAlive } = require('./utils/keepAlive');
+const { verifyConnection } = require('./utils/mailer');
 
 const authRoutes = require('./routes/auth');
 const usersRoutes = require('./routes/users');
@@ -150,6 +151,9 @@ const server = app.listen(PORT, '0.0.0.0', () => {
     console.log(`\n🚀 MCQ Backend running on port ${actualPort}`);
     console.log(`   Health: http://localhost:${actualPort}/health`);
     console.log(`   Mode: ${process.env.NODE_ENV || 'development'}\n`);
+    
+    // Verify Email Connection
+    verifyConnection();
     
     // Start Anti-sleep service
     startKeepAlive(actualPort);
