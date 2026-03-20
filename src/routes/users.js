@@ -14,6 +14,7 @@ router.patch('/me', updateProfile);
 // Admin only
 router.get('/', requireRole('admin'), listUsers);
 router.post('/', requireRole('admin'), adminCreateUser);
+router.post('/:id/reset-password', requireRole('admin'), triggerPasswordReset);
 router.patch('/:id/role', requireRole('admin'), updateUserRole);
 router.patch('/:id/approve', requireRole('admin'), approveUser);
 router.delete('/:id', requireRole('admin'), deleteUser);

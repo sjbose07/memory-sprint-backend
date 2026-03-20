@@ -9,7 +9,7 @@ const transporter = nodemailer.createTransport({
 });
 
 const sendResetEmail = async (email, token) => {
-  const resetUrl = `${process.env.CLIENT_URL || 'http://localhost:6020'}/dashboard/reset-password?token=${token}`;
+  const resetUrl = `${process.env.CLIENT_URL || 'http://localhost:6020'}/reset-password?token=${token}`;
   
   const mailOptions = {
     from: `"MCQ Practice Admin" <${process.env.EMAIL_USER}>`,
@@ -30,7 +30,7 @@ const sendResetEmail = async (email, token) => {
 };
 
 const sendVerificationEmail = async (email, token) => {
-  const verifyUrl = `${process.env.CLIENT_URL || 'http://localhost:6020'}/dashboard/verify-email?token=${token}`;
+  const verifyUrl = `${process.env.CLIENT_URL || 'http://localhost:6020'}/verify-email?token=${token}`;
 
   const mailOptions = {
     from: `"MCQ Practice Admin" <${process.env.EMAIL_USER}>`,
