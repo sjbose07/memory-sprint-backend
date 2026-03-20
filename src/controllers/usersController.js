@@ -156,7 +156,7 @@ const adminCreateUser = async (req, res) => {
         res.status(201).json(user);
     } catch (err) {
         console.error('Admin user creation error:', err);
-        res.status(500).json({ error: 'Server error during user creation', details: err.message, stack: err.stack });
+        res.status(500).json({ error: 'Server error during user creation' });
     }
 };
 
