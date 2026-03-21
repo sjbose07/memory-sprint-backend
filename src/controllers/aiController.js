@@ -55,4 +55,46 @@ const generateQuestions = async (req, res) => {
     }
 };
 
-module.exports = { generateQuestions };
+// POST /ai/enhance
+const enhanceText = async (req, res) => {
+    const { text_content, language = "English" } = req.body;
+
+    if (!text_content) {
+        return res.status(400).json({ error: 'text_content is required' });
+    }
+
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) {
+        return res.status(500).json({ error: 'GEMINI_API_KEY is not configured on the server' });
+    }
+
+    try {
+        const genAI = new GoogleGenerativeAI(apiKey);
+        const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+
+        const prompt = `
+            You are an expert editor and fact-checker. Please review and enhance the following text.
+            1. Format the text beautifully using Markdown (bold, headers, bullet points).
+            2. Make it highly readable and visually attractive.
+            3. Insert relevant emojis or ASCII icons to make it engaging.
+            4. FACT-CHECK the content: If there are any factual errors in the content, correct them seamlessly or naturally integrate the correct facts.
+            5. The final output MUST be in the following language: ${language}.
+            6. Return ONLY the enhanced markdown text, without any additional conversational filler like "Here is the enhanced text".
+
+            CONTENT TO ENHANCE:
+            ${text_content}
+        `;
+
+        const result = await model.generateContent(prompt);
+        const response = await result.response;
+        const enhanced_text = response.text().trim();
+
+        res.json({ enhanced_text });
+
+    } catch (err) {
+        console.error('AI Enhance Error:', err);
+        res.status(500).json({ error: 'Failed to enhance text: ' + err.message });
+    }
+};
+
+module.exports = { generateQuestions, enhanceText };
