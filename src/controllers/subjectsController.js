@@ -6,7 +6,10 @@ const listSubjects = async (req, res) => {
     try {
         const result = await pool.query(
             `SELECT s.id, s.name, s.description, s.created_at,
-              COUNT(c.id)::int AS chapter_count
+              COUNT(DISTINCT c.id)::int AS chapter_count,
+              (SELECT COUNT(sm.id)::int FROM study_materials sm 
+               JOIN chapters ch ON ch.id = sm.chapter_id 
+               WHERE ch.subject_id = s.id) AS material_count
        FROM subjects s
        LEFT JOIN chapters c ON c.subject_id = s.id
        GROUP BY s.id ORDER BY s.name`
@@ -23,7 +26,10 @@ const getSubjectById = async (req, res) => {
     try {
         const result = await pool.query(
             `SELECT s.id, s.name, s.description, s.created_at,
-              COUNT(c.id)::int AS chapter_count
+              COUNT(DISTINCT c.id)::int AS chapter_count,
+              (SELECT COUNT(sm.id)::int FROM study_materials sm 
+               JOIN chapters ch ON ch.id = sm.chapter_id 
+               WHERE ch.subject_id = s.id) AS material_count
        FROM subjects s
        LEFT JOIN chapters c ON c.subject_id = s.id
        WHERE s.id = $1
@@ -152,14 +158,13 @@ const createChapter = async (req, res) => {
 // PATCH /subjects/:subjectId/chapters/:chapterId
 const editChapter = async (req, res) => {
     const { id: subjectId, chapterId } = req.params;
-    const { name, order_num, tags, description } = req.body;
-
+    const { name, order_num, tags, description, type } = req.body;
     if (!name) return res.status(400).json({ error: 'Chapter name is required' });
 
     try {
         const result = await pool.query(
-            'UPDATE chapters SET name = $1, order_num = COALESCE($2, order_num), tags = $3, description = $4 WHERE id = $5 AND subject_id = $6 RETURNING *',
-            [name, order_num || null, tags || [], description || null, chapterId, subjectId]
+            'UPDATE chapters SET name = $1, order_num = COALESCE($2, order_num), tags = $3, description = $4, type = COALESCE($5, type) WHERE id = $6 AND subject_id = $7 RETURNING *',
+            [name, order_num || null, tags || [], description || null, type || null, chapterId, subjectId]
         );
 
         if (!result.rows.length) {

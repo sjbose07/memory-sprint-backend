@@ -3,19 +3,65 @@ const { deleteAssetsFromText } = require('../utils/cloudinaryHelper');
 
 // GET /study-materials?chapter_id=...
 const listMaterials = async (req, res) => {
-    const { chapter_id } = req.query;
     try {
-        let query = `SELECT sm.*, c.name AS chapter_name, s.name AS subject_name 
+        const { 
+            chapter_id, subject_id, current_affair_id,
+            chapterId, subjectId, currentAffairId 
+        } = req.query;
+
+        const cid = chapter_id || chapterId;
+        const sid = subject_id || subjectId;
+        const caid = current_affair_id || currentAffairId;
+
+        console.log('[DEBUG] listMaterials Params:', { chapter_id, subject_id, current_affair_id, chapterId, subjectId, currentAffairId });
+        console.log('[DEBUG] Resolved IDs:', { cid, sid, caid });
+
+        let query = `SELECT sm.*, c.name AS chapter_name, s.name AS subject_name, c.subject_id 
                      FROM study_materials sm
-                     JOIN chapters c ON c.id = sm.chapter_id
-                     JOIN subjects s ON s.id = c.subject_id`;
+                     LEFT JOIN chapters c ON c.id = sm.chapter_id
+                     LEFT JOIN subjects s ON s.id = c.subject_id`;
+        
         const params = [];
-        if (chapter_id) {
-            query += ' WHERE sm.chapter_id = $1';
-            params.push(chapter_id);
+        const whereClauses = [];
+
+        const isTrueVal = (v) => v && v !== 'null' && v !== 'undefined' && v !== '';
+
+        if (isTrueVal(caid)) {
+            // If filtering by Current Affair, we don't care about chapters/subjects
+            params.push(caid);
+            whereClauses.push(`sm.current_affair_id = $${params.length}::UUID`);
+        } else {
+            // Normal Subject/Chapter filtering
+            if (isTrueVal(cid)) {
+                params.push(cid);
+                whereClauses.push(`sm.chapter_id = $${params.length}::UUID`);
+            }
+            if (isTrueVal(sid)) {
+                params.push(sid);
+                whereClauses.push(`c.subject_id = $${params.length}::UUID`);
+            }
         }
+
+        if (whereClauses.length > 0) {
+            query += ' WHERE ' + whereClauses.join(' AND ');
+        } else if (req.query.all !== 'true' || req.user.role !== 'admin') {
+            // For security/leakage prevention: if no filters provided and not admin, return empty
+            console.warn('[SECURITY] listMaterials: Unfiltered request blocked for non-admin or missing all=true.');
+            return res.json([]);
+        }
+
         query += ' ORDER BY sm.created_at DESC';
+
+        console.log('[DEBUG] Final SQL Query:', query);
+        console.log('[DEBUG] SQL Params:', params);
+        console.log('[DEBUG] Final WHERE Clauses:', whereClauses);
+
         const result = await pool.query(query, params);
+        console.log('[DEBUG] Result Count:', result.rows.length);
+        if (result.rows.length > 0) {
+            console.log('[DEBUG] Sample Rows (Subject Names):', result.rows.slice(0, 5).map(r => `${r.title} [Subject: ${r.subject_name}] (SubjectID: ${r.subject_id})`));
+        }
+        console.log('------------------------');
         res.json(result.rows);
     } catch (err) {
         res.status(500).json({ error: err.message });
@@ -24,18 +70,19 @@ const listMaterials = async (req, res) => {
 
 // POST /study-materials
 const createMaterial = async (req, res) => {
-    const { chapter_id, title, content, tags } = req.body;
-    if (!chapter_id || !title || !content) {
-        return res.status(400).json({ error: 'chapter_id, title, and content are required' });
+    const { chapter_id, current_affair_id, title, content, tags } = req.body;
+    if ((!chapter_id && !current_affair_id) || !title || !content) {
+        return res.status(400).json({ error: 'chapter_id or current_affair_id, title, and content are required' });
     }
     try {
         const result = await pool.query(
-            `INSERT INTO study_materials (chapter_id, title, content, tags, created_by)
-             VALUES ($1, $2, $3, $4, $5) RETURNING *`,
-            [chapter_id, title, content, tags || [], req.user.id]
+            `INSERT INTO study_materials (chapter_id, current_affair_id, title, content, tags, created_by)
+             VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
+            [chapter_id || null, current_affair_id || null, title, content, tags || [], req.user.id]
         );
         res.status(201).json(result.rows[0]);
     } catch (err) {
+        console.error('❌ Create Material Error:', err.message);
         res.status(500).json({ error: err.message });
     }
 };

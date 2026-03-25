@@ -6,7 +6,9 @@ const listCurrentAffairs = async (req, res) => {
     const { year, month, topic, tags, search, type } = req.query;
     try {
         let query = `
-            SELECT ca.*, COUNT(q.id) as question_count 
+            SELECT ca.*, 
+                   COUNT(q.id) as question_count,
+                   (SELECT COUNT(sm.id)::int FROM study_materials sm WHERE sm.current_affair_id = ca.id) AS material_count
             FROM current_affairs ca 
             LEFT JOIN questions q ON ca.id = q.current_affair_id 
             WHERE 1=1
@@ -62,20 +64,35 @@ const getCurrentAffairsById = async (req, res) => {
     }
 };
 
-// POST /current-affairs
 const createCurrentAffairs = async (req, res) => {
-    const { title, content, year, month, topic, tags, is_practice_enabled, type } = req.body;
-    if (!title || !content || !year || !month) {
-        return res.status(400).json({ error: 'Title, content, year, and month are required' });
+    console.log('--- Create CA Attempt ---');
+    console.log('Body:', JSON.stringify(req.body));
+    const { title, content, year, month, topic, tags, type } = req.body;
+    
+    if (!title || !year || !month) {
+        return res.status(400).json({ error: 'Title, year, and month are required' });
     }
     try {
+        const values = [
+            title ?? null,
+            content ?? '',
+            parseInt(year) || 2024,
+            parseInt(month) || 1,
+            topic ?? null,
+            tags ?? [],
+            type === 'mcq',
+            type ?? 'oneliner',
+            req.user.id
+        ];
+        console.log('Values:', JSON.stringify(values));
         const result = await pool.query(
             `INSERT INTO current_affairs (title, content, year, month, topic, tags, is_practice_enabled, type, created_by)
              VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *`,
-            [title, content, year, month, topic || null, tags || [], is_practice_enabled || false, type || 'oneliner', req.user.id]
+            values
         );
         res.status(201).json(result.rows[0]);
     } catch (err) {
+        console.error('❌ Create CA Error:', err.message);
         res.status(500).json({ error: err.message });
     }
 };
@@ -83,8 +100,20 @@ const createCurrentAffairs = async (req, res) => {
 // PATCH /current-affairs/:id
 const editCurrentAffairs = async (req, res) => {
     const { id } = req.params;
-    const { title, content, year, month, topic, tags, is_practice_enabled, type } = req.body;
+    const { title, content, year, month, topic, tags, type } = req.body;
     try {
+        const is_practice_enabled = type ? (type === 'mcq') : undefined;
+        const values = [
+            title ?? null,
+            content ?? null,
+            year ? parseInt(year) : null,
+            month ? parseInt(month) : null,
+            topic ?? null,
+            tags ?? null,
+            is_practice_enabled ?? null,
+            type ?? null,
+            id
+        ];
         const result = await pool.query(
             `UPDATE current_affairs 
              SET title = COALESCE($1, title), 
@@ -96,11 +125,12 @@ const editCurrentAffairs = async (req, res) => {
                  is_practice_enabled = COALESCE($7, is_practice_enabled),
                  type = COALESCE($8, type)
              WHERE id = $9 RETURNING *`,
-            [title, content, year, month, topic, tags, is_practice_enabled, type, id]
+            values
         );
         if (!result.rows.length) return res.status(404).json({ error: 'Current Affairs not found' });
         res.json(result.rows[0]);
     } catch (err) {
+        console.error('❌ Update CA Error:', err.message);
         res.status(500).json({ error: err.message });
     }
 };
