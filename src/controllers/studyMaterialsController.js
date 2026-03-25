@@ -71,7 +71,10 @@ const listMaterials = async (req, res) => {
 // POST /study-materials
 const createMaterial = async (req, res) => {
     const { chapter_id, current_affair_id, title, content, tags } = req.body;
+    console.log('[DEBUG] createMaterial Inputs:', { chapter_id, current_affair_id, title, content_length: content?.length, tags });
+    
     if ((!chapter_id && !current_affair_id) || !title || !content) {
+        console.warn('[WARN] createMaterial: Missing required fields');
         return res.status(400).json({ error: 'chapter_id or current_affair_id, title, and content are required' });
     }
     try {
@@ -80,6 +83,7 @@ const createMaterial = async (req, res) => {
              VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
             [chapter_id || null, current_affair_id || null, title, content, tags || [], req.user.id]
         );
+        console.log('[DEBUG] createMaterial: Success, ID =', result.rows[0].id);
         res.status(201).json(result.rows[0]);
     } catch (err) {
         console.error('❌ Create Material Error:', err.message);

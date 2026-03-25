@@ -136,8 +136,6 @@ const gracefulShutdown = async (signal) => {
 process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
 process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 
-const PORT = process.env.PORT || 7860;
-
 // Log environment status for debugging (don't log actual values of secrets!)
 console.log('--- Environment Check ---');
 console.log(`DATABASE_URL: ${process.env.DATABASE_URL ? 'PRESENT' : 'MISSING'}`);
@@ -146,17 +144,37 @@ console.log(`GOOGLE_CLIENT_ID: ${process.env.GOOGLE_CLIENT_ID ? 'PRESENT' : 'MIS
 console.log(`GEMINI_API_KEY: ${process.env.GEMINI_API_KEY ? 'PRESENT' : 'MISSING'}`);
 console.log('-------------------------');
 
-const server = app.listen(PORT, '0.0.0.0', () => {
-    const actualPort = server.address().port;
-    console.log(`\n🚀 MCQ Backend running on port ${actualPort}`);
-    console.log(`   Health: http://localhost:${actualPort}/health`);
-    console.log(`   Mode: ${process.env.NODE_ENV || 'development'}\n`);
-    
-    // Verify Email Connection
-    verifyConnection();
-    
-    // Start Anti-sleep service
-    startKeepAlive(actualPort);
-});
+const BASE_PORT = parseInt(process.env.PORT || '5005', 10);
+
+function startServer(port) {
+    const server = app.listen(port, '0.0.0.0');
+
+    server.on('listening', async () => {
+        const actualPort = server.address().port;
+        console.log(`\n✅ MCQ Backend running on port ${actualPort}`);
+        console.log(`   Health: http://localhost:${actualPort}/health`);
+        console.log(`   Mode: ${process.env.NODE_ENV || 'development'}\n`);
+        // Update env so other services know the actual port
+        process.env.PORT = String(actualPort);
+        verifyConnection();
+        startKeepAlive(actualPort);
+    });
+
+    server.on('error', (err) => {
+        if (err.code === 'EADDRINUSE') {
+            console.warn(`⚠️  Port ${port} is busy. Trying port ${port + 1}...`);
+            server.close();
+            startServer(port + 1);
+        } else {
+            console.error('❌ Server error:', err);
+            process.exit(1);
+        }
+    });
+
+    return server;
+}
+
+const server = startServer(BASE_PORT);
 
 module.exports = app;
+
