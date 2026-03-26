@@ -13,6 +13,6 @@ router.post('/forgot-password', authController.forgotPassword);
 router.post('/reset-password', authController.resetPassword);
 router.post('/change-password', authMiddleware, authController.changePassword);
 router.get('/verify-email', authController.verifyEmail);
-router.post('/test-email', authController.testEmail);
+// router.post('/test-email', authController.testEmail); // REMOVED: Security Risk
 
 module.exports = router;

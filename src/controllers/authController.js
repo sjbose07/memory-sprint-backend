@@ -300,9 +300,7 @@ const testEmail = async (req, res) => {
         console.error('Test Email Error Details:', err);
         res.status(500).json({ 
             error: 'Failed to send test email', 
-            details: err.message,
-            code: err.code,
-            command: err.command
+            details: process.env.NODE_ENV === 'production' ? 'Internal server error' : err.message
         });
     }
 };
