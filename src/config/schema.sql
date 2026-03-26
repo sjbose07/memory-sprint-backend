@@ -121,6 +121,18 @@ CREATE TABLE IF NOT EXISTS current_affairs (
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+-- Study Materials table
+CREATE TABLE IF NOT EXISTS study_materials (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    chapter_id UUID REFERENCES chapters(id) ON DELETE CASCADE,
+    current_affair_id UUID REFERENCES current_affairs(id) ON DELETE SET NULL,
+    title TEXT NOT NULL,
+    content TEXT NOT NULL,
+    tags TEXT[] DEFAULT '{}',
+    created_by UUID REFERENCES users(id) ON DELETE SET NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
 -- Admin Notices table for system alerts and errors
 CREATE TABLE IF NOT EXISTS admin_notices (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -134,10 +146,13 @@ CREATE TABLE IF NOT EXISTS admin_notices (
 -- Indexes for performance
 CREATE INDEX IF NOT EXISTS idx_chapters_subject ON chapters(subject_id);
 CREATE INDEX IF NOT EXISTS idx_questions_chapter ON questions(chapter_id);
+CREATE INDEX IF NOT EXISTS idx_questions_ca ON questions(current_affair_id);
 CREATE INDEX IF NOT EXISTS idx_tests_chapter ON tests(chapter_id);
 CREATE INDEX IF NOT EXISTS idx_attempts_user ON test_attempts(user_id);
 CREATE INDEX IF NOT EXISTS idx_attempts_test ON test_attempts(test_id);
 CREATE INDEX IF NOT EXISTS idx_answers_attempt ON attempt_answers(attempt_id);
 CREATE INDEX IF NOT EXISTS idx_bookmarks_user ON bookmarks(user_id);
 CREATE INDEX IF NOT EXISTS idx_ca_date ON current_affairs(year, month);
+CREATE INDEX IF NOT EXISTS idx_sm_chapter ON study_materials(chapter_id);
+CREATE INDEX IF NOT EXISTS idx_sm_ca ON study_materials(current_affair_id);
 CREATE INDEX IF NOT EXISTS idx_wrong_answers ON attempt_answers(attempt_id, is_correct) WHERE is_correct = FALSE;

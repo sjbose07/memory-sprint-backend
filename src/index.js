@@ -29,22 +29,22 @@ const adminNoticesRoutes = require('./routes/adminNotices');
 const app = express();
 
 // --- Security & Production Middleware ---
-app.use(helmet()); 
-app.use(compression()); 
+app.use(helmet());
+app.use(compression());
 app.use(morgan(process.env.NODE_ENV === 'production' ? 'combined' : 'dev'));
 
 const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 100,
-  message: { error: 'Too many requests, please try again later.' },
-  standardHeaders: true,
-  legacyHeaders: false,
+    windowMs: 15 * 60 * 1000,
+    max: 100,
+    message: { error: 'Too many requests, please try again later.' },
+    standardHeaders: true,
+    legacyHeaders: false,
 });
 app.use(limiter);
 
 const corsOptions = {
-  origin: process.env.CLIENT_URL || '*',
-  optionsSuccessStatus: 200
+    origin: process.env.CLIENT_URL || '*',
+    optionsSuccessStatus: 200
 };
 app.use(cors(corsOptions));
 app.use(express.json({ limit: '10mb' }));
@@ -83,23 +83,23 @@ app.use('/admin/notices', adminNoticesRoutes);
 // Global error handler
 app.use((err, req, res, next) => {
     console.error('Unhandled error:', err);
-    
+
     const isProd = process.env.NODE_ENV === 'production';
-    
+
     // Create admin notice for unexpected 500 errors
     if (!res.headersSent) {
         createNotice('SYSTEM_ERROR', 'API 500 Error', `${err.message}\n${err.stack}`)
-          .catch(e => console.error('Failed to create admin notice:', e));
+            .catch(e => console.error('Failed to create admin notice:', e));
     }
 
     if (err.message && err.message.includes('Only PDF')) {
         return res.status(400).json({ error: err.message });
     }
 
-    res.status(500).json({ 
-        error: 'Internal server error', 
+    res.status(500).json({
+        error: 'Internal server error',
         details: isProd ? 'An unexpected error occurred. Please contact support.' : err.message,
-        stack: isProd ? undefined : err.stack 
+        stack: isProd ? undefined : err.stack
     });
 });
 
