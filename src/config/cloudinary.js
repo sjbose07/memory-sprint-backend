@@ -27,11 +27,21 @@ const storage = new CloudinaryStorage({
     const sanitizedSubject = rawSubject.replace(/[^a-zA-Z0-9]/g, "_");
     
     let mediaType = 'other';
-    if (file.mimetype.startsWith('image/')) mediaType = 'image';
-    else if (file.mimetype === 'application/pdf') mediaType = 'pdf';
+    let resourceType = 'raw';
+    
+    if (file.mimetype.startsWith('image/')) {
+        mediaType = 'image';
+        resourceType = 'image';
+    } else if (file.mimetype.startsWith('video/')) {
+        mediaType = 'video';
+        resourceType = 'video';
+    } else if (file.mimetype === 'application/pdf') {
+        mediaType = 'pdf';
+        resourceType = 'raw';
+    }
 
     const isPdf = file.mimetype === 'application/pdf';
-    
+    const isVideo = file.mimetype.startsWith('video/');
     // 1. Clear special characters but keep underscores and hyphens
     let sanitizedName = file.originalname
         .replace(/\.[^/.]+$/, "") // Temporarily remove extension
@@ -40,14 +50,14 @@ const storage = new CloudinaryStorage({
     // 2. Logic to prevent "Blocked for delivery" and 404:
     // - PDF must be 'raw' to avoid account delivery restrictions.
     // - 'raw' files MUST have an extension in public_id.
-    // - 'image' files MUST NOT have an extension in public_id.
+    // - 'video' files often need extension too to be served with correct header depending on context, or can rely on format. We keep extension for raw and let Cloudinary handle videos properly.
     if (isPdf) {
         sanitizedName += ".pdf";
     }
     
     return {
         folder: `mcq-practice/${sanitizedSubject}/${mediaType}`,
-        resource_type: isPdf ? 'raw' : 'image', 
+        resource_type: resourceType, 
         public_id: `${Date.now()}-${sanitizedName}`
     };
   },
