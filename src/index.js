@@ -33,20 +33,22 @@ app.use(helmet());
 app.use(compression());
 app.use(morgan(process.env.NODE_ENV === 'production' ? 'combined' : 'dev'));
 
+const corsOptions = {
+    origin: process.env.CLIENT_URL || '*',
+    optionsSuccessStatus: 200
+};
+app.use(cors(corsOptions));
+
 const limiter = rateLimit({
     windowMs: 15 * 60 * 1000,
-    max: 100,
+    max: 1000,
     message: { error: 'Too many requests, please try again later.' },
     standardHeaders: true,
     legacyHeaders: false,
 });
 app.use(limiter);
 
-const corsOptions = {
-    origin: process.env.CLIENT_URL || '*',
-    optionsSuccessStatus: 200
-};
-app.use(cors(corsOptions));
+
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
