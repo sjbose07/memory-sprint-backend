@@ -34,10 +34,14 @@ app.use(compression());
 app.use(morgan(process.env.NODE_ENV === 'production' ? 'combined' : 'dev'));
 
 const corsOptions = {
-    origin: process.env.CLIENT_URL || '*',
+    origin: '*', // For development flexibility; restrict in production if needed
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+    credentials: true,
     optionsSuccessStatus: 200
 };
 app.use(cors(corsOptions));
+app.options('*', cors(corsOptions)); // Enable pre-flight for all
 
 const limiter = rateLimit({
     windowMs: 15 * 60 * 1000,
@@ -88,9 +92,8 @@ app.use((err, req, res, next) => {
 
     const isProd = process.env.NODE_ENV === 'production';
 
-    // Create admin notice for unexpected 500 errors
     if (!res.headersSent) {
-        createNotice('SYSTEM_ERROR', 'API 500 Error', `${err.message}\n${err.stack}`)
+        createNotice('SYSTEM_ERROR', 'API 500 Error', `${err.message || 'Unknown'}\n${err.stack || ''}`)
             .catch(e => console.error('Failed to create admin notice:', e));
     }
 
