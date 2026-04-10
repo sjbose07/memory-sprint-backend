@@ -52,6 +52,15 @@ const limiter = rateLimit({
 });
 app.use(limiter);
 
+// Stricter limiter for Auth (30 requests per 15 minutes)
+const authLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 30,
+    message: { error: 'Too many auth attempts, please try again in 15 minutes.' },
+    standardHeaders: true,
+    legacyHeaders: false,
+});
+
 
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
@@ -70,7 +79,7 @@ app.get('/health', (req, res) => {
 });
 
 // Routes
-app.use('/auth', authRoutes);
+app.use('/auth', authLimiter, authRoutes);
 app.use('/users', usersRoutes);
 app.use('/subjects', subjectsRoutes);
 app.use('/questions', questionsRoutes);

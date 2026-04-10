@@ -22,12 +22,11 @@ function setCached(userId, data) {
 const getHomeSummary = async (req, res) => {
     try {
         const userId = req.user.id;
-        // const cached = getCached(userId); // Disabled for troubleshooting
+        const cached = getCached('GLOBAL_SUMMARY'); // Use a shared key for non-user-specific data
 
         let testsRows, caRows, subjects;
 
-        if (false) { // if (cached) {
-            // Serve shared data from cache (instant)
+        if (cached) {
             ({ testsRows, caRows, subjects } = cached);
         } else {
             // Fetch shared data in parallel
@@ -67,7 +66,7 @@ const getHomeSummary = async (req, res) => {
             caRows     = caRes.rows;
             subjects   = subjectsRes.rows;
 
-            setCached(userId, { testsRows, caRows, subjects });
+            setCached('GLOBAL_SUMMARY', { testsRows, caRows, subjects });
         }
 
         // Always fetch user-specific last practiced (cheap single query)
@@ -100,6 +99,7 @@ const getHomeSummary = async (req, res) => {
             }
         }
 
+        res.set('Cache-Control', 'public, max-age=30'); // Browser/Proxy cache for 30s
         res.json({
             recentTests:    testsRows,
             recentCA:       caRows,
