@@ -53,7 +53,11 @@ const getHomeSummary = async (req, res) => {
                 `).catch(e => { console.error('CA Query Error:', e.message); return { rows: [] }; }),
 
                 pool.query(`
-                    SELECT s.*, (SELECT COUNT(*)::int FROM chapters c WHERE c.subject_id = s.id) as chapter_count
+                    SELECT s.*, 
+                           (SELECT COUNT(*)::int FROM chapters c WHERE c.subject_id = s.id) as chapter_count,
+                           (SELECT COUNT(*)::int FROM study_materials sm 
+                            JOIN chapters c ON c.id = sm.chapter_id 
+                            WHERE c.subject_id = s.id) as material_count
                     FROM subjects s
                     ORDER BY s.name ASC
                 `).catch(e => { console.error('Subjects Query Error:', e.message); return { rows: [] }; })
