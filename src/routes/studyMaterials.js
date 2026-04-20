@@ -8,6 +8,7 @@ router.use(authMiddleware);
 
 router.get('/', listMaterials);
 router.post('/', requireRole('admin', 'moderator'), createMaterial);
+router.patch('/reorder', requireRole('admin', 'moderator'), reorderMaterials);
 router.patch('/:id', requireRole('admin', 'moderator'), updateMaterial);
 router.delete('/:id', requireRole('admin', 'moderator'), deleteMaterial);
 

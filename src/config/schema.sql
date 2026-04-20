@@ -38,9 +38,18 @@ CREATE TABLE IF NOT EXISTS subjects (
 );
 
 -- Chapters table
+CREATE TABLE IF NOT EXISTS chapter_groups (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    subject_id UUID NOT NULL REFERENCES subjects(id) ON DELETE CASCADE,
+    name VARCHAR(255) NOT NULL,
+    order_num INT NOT NULL DEFAULT 0,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
 CREATE TABLE IF NOT EXISTS chapters (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     subject_id UUID NOT NULL REFERENCES subjects(id) ON DELETE CASCADE,
+    group_id UUID REFERENCES chapter_groups(id) ON DELETE SET NULL,
     name VARCHAR(255) NOT NULL,
     order_num INT NOT NULL DEFAULT 0,
     tags TEXT[] DEFAULT '{}',
@@ -129,6 +138,7 @@ CREATE TABLE IF NOT EXISTS study_materials (
     title TEXT NOT NULL,
     content TEXT NOT NULL,
     tags TEXT[] DEFAULT '{}',
+    order_num INT NOT NULL DEFAULT 0,
     created_by UUID REFERENCES users(id) ON DELETE SET NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );

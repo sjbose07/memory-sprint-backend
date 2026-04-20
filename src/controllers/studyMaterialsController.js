@@ -50,7 +50,7 @@ const listMaterials = async (req, res) => {
             return res.json([]);
         }
 
-        query += ' ORDER BY sm.created_at DESC';
+        query += ' ORDER BY sm.order_num, sm.created_at DESC';
 
         console.log('[DEBUG] Final SQL Query:', query);
         console.log('[DEBUG] SQL Params:', params);
@@ -133,4 +133,26 @@ const deleteMaterial = async (req, res) => {
     }
 };
 
-module.exports = { listMaterials, createMaterial, updateMaterial, deleteMaterial };
+// PATCH /study-materials/reorder
+const reorderMaterials = async (req, res) => {
+    const { materialIds } = req.body; // Array of UUIDs in new order
+
+    if (!Array.isArray(materialIds)) return res.status(400).json({ error: 'materialIds array required' });
+
+    try {
+        await pool.query('BEGIN');
+        for (let i = 0; i < materialIds.length; i++) {
+            await pool.query(
+                'UPDATE study_materials SET order_num = $1 WHERE id = $2',
+                [i, materialIds[i]]
+            );
+        }
+        await pool.query('COMMIT');
+        res.json({ message: 'Materials reordered' });
+    } catch (err) {
+        await pool.query('ROLLBACK');
+        res.status(500).json({ error: err.message });
+    }
+};
+
+module.exports = { listMaterials, createMaterial, updateMaterial, deleteMaterial, reorderMaterials };

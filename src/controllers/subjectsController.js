@@ -121,7 +121,7 @@ const listChapters = async (req, res) => {
     try {
         const userId = req.user ? req.user.id : null;
         const result = await pool.query(
-            `SELECT c.id, c.subject_id, c.name, c.description, c.order_num, c.tags, c.type, c.created_at,
+            `SELECT c.id, c.subject_id, c.group_id, c.name, c.description, c.order_num, c.tags, c.type, c.created_at,
               (SELECT COUNT(q.id)::int FROM questions q WHERE q.chapter_id = c.id AND q.type = 'mcq') AS mcq_count,
               (SELECT COUNT(sm.id)::int FROM study_materials sm WHERE sm.chapter_id = c.id) AS material_count,
               ps.score AS last_practice_score,
@@ -201,4 +201,112 @@ const deleteChapter = async (req, res) => {
     }
 };
 
-module.exports = { listSubjects, createSubject, deleteSubject, editSubject, getSubjectById, listChapters, createChapter, editChapter, deleteChapter };
+// PATCH /subjects/:id/chapters/reorder
+const reorderChapters = async (req, res) => {
+    const { id: subjectId } = req.params;
+    const { chapterIds } = req.body; // Array of UUIDs in new order
+
+    if (!Array.isArray(chapterIds)) return res.status(400).json({ error: 'chapterIds array required' });
+
+    try {
+        await pool.query('BEGIN');
+        for (let i = 0; i < chapterIds.length; i++) {
+            await pool.query(
+                'UPDATE chapters SET order_num = $1 WHERE id = $2 AND subject_id = $3',
+                [i, chapterIds[i], subjectId]
+            );
+        }
+        await pool.query('COMMIT');
+        res.json({ message: 'Chapters reordered' });
+    } catch (err) {
+        await pool.query('ROLLBACK');
+        res.status(500).json({ error: err.message });
+    }
+};
+
+// GET /subjects/:id/groups
+const listChapterGroups = async (req, res) => {
+    try {
+        const result = await pool.query(
+            'SELECT * FROM chapter_groups WHERE subject_id = $1 ORDER BY order_num, name',
+            [req.params.id]
+        );
+        res.json(result.rows);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+};
+
+// POST /subjects/:id/groups
+const createChapterGroup = async (req, res) => {
+    const { name, order_num } = req.body;
+    if (!name) return res.status(400).json({ error: 'Group name is required' });
+    try {
+        const result = await pool.query(
+            'INSERT INTO chapter_groups (subject_id, name, order_num) VALUES ($1, $2, $3) RETURNING *',
+            [req.params.id, name, order_num || 0]
+        );
+        res.status(201).json(result.rows[0]);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+};
+
+// PATCH /subjects/:id/groups/:groupId
+const editChapterGroup = async (req, res) => {
+    const { id: subjectId, groupId } = req.params;
+    const { name, order_num } = req.body;
+    try {
+        const result = await pool.query(
+            'UPDATE chapter_groups SET name = COALESCE($1, name), order_num = COALESCE($2, order_num) WHERE id = $3 AND subject_id = $4 RETURNING *',
+            [name || null, order_num || null, groupId, subjectId]
+        );
+        if (!result.rows.length) return res.status(404).json({ error: 'Group not found' });
+        res.json(result.rows[0]);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+};
+
+// DELETE /subjects/:id/groups/:groupId
+const deleteChapterGroup = async (req, res) => {
+    const { id: subjectId, groupId } = req.params;
+    try {
+        const result = await pool.query(
+            'DELETE FROM chapter_groups WHERE id = $1 AND subject_id = $2 RETURNING id',
+            [groupId, subjectId]
+        );
+        if (!result.rows.length) return res.status(404).json({ error: 'Group not found' });
+        res.json({ message: 'Group deleted' });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+};
+
+// PATCH /subjects/:id/chapters/bulk-move
+const bulkMoveChapters = async (req, res) => {
+    const { id: subjectId } = req.params;
+    const { chapterIds, groupId } = req.body; // groupId can be null
+    if (!Array.isArray(chapterIds)) return res.status(400).json({ error: 'chapterIds array required' });
+
+    try {
+        await pool.query('BEGIN');
+        for (const chapterId of chapterIds) {
+            await pool.query(
+                'UPDATE chapters SET group_id = $1 WHERE id = $2 AND subject_id = $3',
+                [groupId || null, chapterId, subjectId]
+            );
+        }
+        await pool.query('COMMIT');
+        res.json({ message: 'Chapters moved successfully' });
+    } catch (err) {
+        await pool.query('ROLLBACK');
+        res.status(500).json({ error: err.message });
+    }
+};
+
+module.exports = { 
+    listSubjects, createSubject, deleteSubject, editSubject, getSubjectById, 
+    listChapters, createChapter, editChapter, deleteChapter, reorderChapters,
+    listChapterGroups, createChapterGroup, editChapterGroup, deleteChapterGroup, bulkMoveChapters
+};
