@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { listMaterials, createMaterial, updateMaterial, deleteMaterial } = require('../controllers/studyMaterialsController');
+const { listMaterials, createMaterial, updateMaterial, deleteMaterial, reorderMaterials } = require('../controllers/studyMaterialsController');
 const authMiddleware = require('../middleware/auth');
 const requireRole = require('../middleware/roles');
 

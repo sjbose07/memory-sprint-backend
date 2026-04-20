@@ -4,8 +4,8 @@ const cron = require('node-cron');
 const startKeepAlive = (port) => {
   const url = `http://localhost:${port}/health`;
   
-  // Every 10 minutes, ping itself
-  cron.schedule('*/10 * * * *', async () => {
+  // Every 3 hours, ping itself
+  cron.schedule('0 */3 * * *', async () => {
     try {
       console.log(`⏱️ Self-pinging health endpoint: ${url}`);
       await axios.get(url);
@@ -14,7 +14,7 @@ const startKeepAlive = (port) => {
     }
   });
 
-  console.log('🚀 Anti-sleep (Keep-alive) service scheduled (every 10 mins)');
+  console.log('🚀 Anti-sleep (Keep-alive) service scheduled (every 3 hrs)');
 };
 
 module.exports = { startKeepAlive };
