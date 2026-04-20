@@ -80,7 +80,7 @@ CREATE TABLE IF NOT EXISTS tests (
     chapter_id UUID REFERENCES chapters(id) ON DELETE CASCADE,
     timer_minutes INT NOT NULL DEFAULT 30,
     question_count INT NOT NULL DEFAULT 10,
-    is_negative BOOLEAN DEFAULT FALSE,
+    negative_marking BOOLEAN DEFAULT FALSE,
     is_strict BOOLEAN DEFAULT FALSE,
     created_by UUID REFERENCES users(id) ON DELETE SET NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()

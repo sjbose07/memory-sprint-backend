@@ -4,7 +4,7 @@ const pool = require('../config/db');
 const listTests = async (req, res) => {
     const { chapter_id, current_affair_id } = req.query;
     try {
-        let query = `SELECT t.id, t.title, t.timer_minutes, t.question_count, t.created_at, t.share_code, t.negative_marking, t.is_strict, t.chapter_id, t.current_affair_id,
+        let query = `SELECT t.id, t.title, t.timer_minutes, t.question_count, t.created_at, t.share_code, t.negative_marking, t.negative_marking AS is_negative, t.is_strict, t.chapter_id, t.current_affair_id,
                         c.name AS chapter_name, ca.title AS ca_title
                  FROM tests t
                  LEFT JOIN chapters c ON c.id = t.chapter_id
@@ -94,7 +94,7 @@ const getTestByCode = async (req, res) => {
     const { code } = req.params;
     try {
         const result = await pool.query(
-            `SELECT t.*, c.name AS chapter_name, ca.title AS ca_title
+            `SELECT t.*, t.negative_marking AS is_negative, c.name AS chapter_name, ca.title AS ca_title
              FROM tests t
              LEFT JOIN chapters c ON c.id = t.chapter_id
              LEFT JOIN current_affairs ca ON ca.id = t.current_affair_id
