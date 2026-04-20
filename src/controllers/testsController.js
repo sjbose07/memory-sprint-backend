@@ -42,9 +42,8 @@ const createTest = async (req, res) => {
     if (!title || (!chapter_id && !current_affair_id)) {
         return res.status(400).json({ error: 'title and (chapter_id or current_affair_id) are required' });
     }
-
-    // Handle incoming field name mismatch (is_negative vs negative_marking)
     const negMarking = (negative_marking === true || is_negative === true);
+    const strictMode = (is_strict === true);
     const requested = parseInt(question_count) || 10;
 
     try {
