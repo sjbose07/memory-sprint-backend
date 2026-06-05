@@ -206,4 +206,68 @@ const bulkSyncQuestions = async (req, res) => {
     }
 };
 
-module.exports = { listQuestions, createQuestion, bulkUploadQuestions, deleteQuestion, previewQuestions, bulkExportQuestions, bulkSyncQuestions };
+// PATCH /questions/:id
+const updateQuestion = async (req, res) => {
+    const { id } = req.params;
+    const { question_text, option_a, option_b, option_c, option_d, correct_option, explanation, type } = req.body;
+
+    if (correct_option && !['A', 'B', 'C', 'D'].includes(correct_option.toUpperCase())) {
+        return res.status(400).json({ error: 'correct_option must be A, B, C, or D' });
+    }
+
+    try {
+        const checkExist = await pool.query('SELECT * FROM questions WHERE id = $1', [id]);
+        if (!checkExist.rows.length) {
+            return res.status(404).json({ error: 'Question not found' });
+        }
+
+        const updates = [];
+        const params = [id];
+        let paramIndex = 2;
+
+        if (question_text !== undefined) {
+            updates.push(`question_text = $${paramIndex++}`);
+            params.push(question_text);
+        }
+        if (option_a !== undefined) {
+            updates.push(`option_a = $${paramIndex++}`);
+            params.push(option_a);
+        }
+        if (option_b !== undefined) {
+            updates.push(`option_b = $${paramIndex++}`);
+            params.push(option_b);
+        }
+        if (option_c !== undefined) {
+            updates.push(`option_c = $${paramIndex++}`);
+            params.push(option_c);
+        }
+        if (option_d !== undefined) {
+            updates.push(`option_d = $${paramIndex++}`);
+            params.push(option_d);
+        }
+        if (correct_option !== undefined) {
+            updates.push(`correct_option = $${paramIndex++}`);
+            params.push(correct_option.toUpperCase());
+        }
+        if (explanation !== undefined) {
+            updates.push(`explanation = $${paramIndex++}`);
+            params.push(explanation);
+        }
+        if (type !== undefined) {
+            updates.push(`type = $${paramIndex++}`);
+            params.push(type);
+        }
+
+        if (updates.length === 0) {
+            return res.status(400).json({ error: 'No fields to update' });
+        }
+
+        const query = `UPDATE questions SET ${updates.join(', ')} WHERE id = $1 RETURNING *`;
+        const result = await pool.query(query, params);
+        res.json(result.rows[0]);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+};
+
+module.exports = { listQuestions, createQuestion, bulkUploadQuestions, deleteQuestion, previewQuestions, bulkExportQuestions, bulkSyncQuestions, updateQuestion };

@@ -3,7 +3,8 @@ const multer = require('multer');
 const router = express.Router();
 const {
     listQuestions, createQuestion, bulkUploadQuestions,
-    deleteQuestion, previewQuestions, bulkExportQuestions, bulkSyncQuestions
+    deleteQuestion, previewQuestions, bulkExportQuestions, bulkSyncQuestions,
+    updateQuestion
 } = require('../controllers/questionsController');
 const authMiddleware = require('../middleware/auth');
 const requireRole = require('../middleware/roles');
@@ -31,5 +32,6 @@ router.post('/preview', requireRole('admin', 'moderator'), upload.single('file')
 router.get('/bulk-export/:chapterId', requireRole('admin', 'moderator'), bulkExportQuestions);
 router.put('/bulk-sync/:chapterId', requireRole('admin', 'moderator'), bulkSyncQuestions);
 router.delete('/:id', requireRole('admin', 'moderator'), deleteQuestion);
+router.patch('/:id', requireRole('admin'), updateQuestion);
 
 module.exports = router;
